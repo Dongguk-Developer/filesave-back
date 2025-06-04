@@ -49,4 +49,4 @@ logging:
     org.hibernate.orm.jdbc.bind: trace
 file:
   upload-dir:
-    C:/test
+    /upload
