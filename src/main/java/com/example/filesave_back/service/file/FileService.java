@@ -15,12 +15,13 @@ import com.example.filesave_back.usecase.file.FileUseCase;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.beans.factory.annotation.Value;
 import java.io.File;
+import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.springframework.core.io.Resource;
 
 @Service
 @RequiredArgsConstructor
@@ -54,17 +56,27 @@ public class FileService implements FileUseCase {
     @Override
     @Transactional
     public ResponseEntity<FileUploadResponse> uploadFiles(String token,FileUploadRequest request, HttpServletResponse response){
+        System.out.println("57");
         Token temp = tokenQueryRepository.findByData(token).orElse(null);
         if(temp != null){
+            System.out.println(token);
             throw new RuntimeException("중복 토큰 사용");
         }
         String code = request.code();
+        System.out.println("63");
 
         List<Share> shares = shareQueryRepository.findByCode(code).orElse(new ArrayList<>());
         System.out.println(shares);
         if(!shares.isEmpty()){
+//            System.out.println("중복 공유 코드 사용");
+//            System.out.println(code);
+//            for(Share share : shares){
+//                System.out.println(share.getCode());
+//                System.out.println(share.getId());
+//            }
             throw new RuntimeException("중복 공유 코드 사용");
         }
+        System.out.println("70");
 
 
         List<MultipartFile> files = request.files();
@@ -79,6 +91,7 @@ public class FileService implements FileUseCase {
         String date = parts[0];
         String timeStamp = parts[1];
 
+        System.out.println("85");
 
         for (MultipartFile file : files) {
             final int fileIndex = index;
@@ -158,7 +171,7 @@ public class FileService implements FileUseCase {
                     }
                     Path filePath = Paths.get(groupDirectory.getAbsolutePath(), fileInfo.fileName());
                     file.transferTo(filePath.toFile());
-                    Store store = storeCommandRepository.save(Store.builder().fileType(fileType).createdAt(LocalDateTime.now()).filename(filePath.toString()).filesize(file.getSize()).build());
+                    Store store = storeCommandRepository.save(Store.builder().filename(fileInfo.fileName()).fileType(fileType).createdAt(LocalDateTime.now()).filesize(file.getSize()).build());
                     shareCommandRepository.save(Share.builder().code(code).store(store).build());
                     return FileSummary.builder().filename(filePath.toString()).filesize(file.getSize()).createdAt(LocalDateTime.now()).build();
                 } catch (IOException e) {
@@ -215,5 +228,33 @@ public class FileService implements FileUseCase {
                                 FileSummaryResponse.builder().files(filesummaries).code(code).token(newToken).build()
                         );
 
+    }
+    @Override
+    public ResponseEntity<Resource> downloadFile(String filename,String timeStamp) throws MalformedURLException {
+        LocalDateTime localDateTime = LocalDateTime.parse(timeStamp);
+        Store store = storeQueryRepository.findByFilenameAndCreatedAt(filename,localDateTime).orElse(null);
+
+        if(store == null) {
+            System.out.println(238);
+            System.out.println(filename);
+            System.out.println(localDateTime);
+            return ResponseEntity.notFound().build();
+        }
+
+        Path filePath = Paths.get(uploadDirectory).resolve(filename).normalize();
+        Resource resource = new UrlResource(filePath.toUri());
+
+
+
+        if (!resource.exists()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        String contentDisposition = "attachment; filename=\"" + resource.getFilename() + "\"";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .body(resource);
     }
 }

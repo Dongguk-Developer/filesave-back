@@ -9,6 +9,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.*;
+import org.springframework.core.io.Resource;
+import java.net.MalformedURLException;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,5 +41,14 @@ public class FileApi {
             @PathVariable String code
     ){
         return fileService.getFiles(token,code);
+    }
+
+    @GetMapping("/download")
+    public ResponseEntity<Resource> downloadFile(@RequestParam String filename,@RequestParam String timestamp) {
+        try {
+            return fileService.downloadFile(filename,timestamp);
+        } catch (MalformedURLException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

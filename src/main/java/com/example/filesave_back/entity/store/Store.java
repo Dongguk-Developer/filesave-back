@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 public class Store {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Id
-    @Column(name="file_id")
+    @Column(name="store_id")
     private Long id;
 
     @Column(nullable = false)
